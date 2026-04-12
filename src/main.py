@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import streamlit as st
+
+from core.parser import parse_input_text
+from solvers.forward_chaining import solve_forward_chaining
+from utils.io import format_solution, save_text_output
+
+
+def _list_input_files() -> list[Path]:
+    input_dir = Path("../input")
+    if not input_dir.exists():
+        return []
+    return sorted(input_dir.glob("*.txt"))
+
+
+def _render_sidebar() -> tuple[str | None, str | None]:
+    st.sidebar.header("Input Files")
+    files = _list_input_files()
+    if not files:
+        st.sidebar.info("No .txt file found in ./input")
+        return None, None
+
+    selected = st.sidebar.selectbox("Input file", files, format_func=lambda p: p.name)
+    content = selected.read_text(encoding="utf-8")
+    return selected.name, content
+
+
+def main() -> None:
+    st.set_page_config(page_title="Futoshiki Solver", layout="wide")
+    st.title("Futoshiki Solver - Streamlit")
+    st.caption("Current solver: Forward chaining")
+
+    if "solved_text" not in st.session_state:
+        st.session_state.solved_text = ""
+    if "output_name" not in st.session_state:
+        st.session_state.output_name = ""
+
+    file_name, raw_input = _render_sidebar()
+
+    solve_clicked = st.button("Solve", disabled=not raw_input)
+    validate_clicked = st.button("Validate Input", disabled=not raw_input)
+
+    if raw_input and solve_clicked:
+        try:
+            puzzle = parse_input_text(raw_input)
+            with st.spinner("Solving..."):
+                solved = solve_forward_chaining(puzzle)
+            if solved is None:
+                st.error("No valid solution found.")
+            else:
+                rendered = format_solution(puzzle, solved)
+                st.session_state.solved_text = rendered
+
+                output_dir = Path("../output")
+                output_dir.mkdir(parents=True, exist_ok=True)
+                if file_name and file_name.startswith("input-"):
+                    output_name = file_name.replace("input-", "output-")
+                else:
+                    output_name = f"output-{file_name}"
+                output_path = output_dir / output_name
+                save_text_output(output_path, rendered)
+                st.session_state.output_name = output_name
+                st.success(f"Saved to {output_path}")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Cannot solve input: {exc}")
+
+    if raw_input and validate_clicked:
+        try:
+            puzzle_preview = parse_input_text(raw_input)
+            st.success(f"Valid format. N = {puzzle_preview.size}")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Input is invalid: {exc}")
+
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        st.subheader("Input")
+        if raw_input:
+            st.text_area("Input content", raw_input, height=420, disabled=True)
+        else:
+            st.info("No input file found in ./input. Please add your input files there.")
+
+    with right_col:
+        st.subheader("Output")
+        st.text_area("Solved result", st.session_state.solved_text, height=420, disabled=True)
+
+        if st.session_state.solved_text and st.session_state.output_name:
+            st.download_button(
+                label="Download output",
+                data=st.session_state.solved_text + "\n",
+                file_name=st.session_state.output_name,
+                mime="text/plain",
+            )
+
+
+if __name__ == "__main__":
+    main()
