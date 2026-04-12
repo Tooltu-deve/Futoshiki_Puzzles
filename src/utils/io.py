@@ -21,7 +21,7 @@ def format_solution(puzzle: Puzzle, solved_grid: list[list[int]]) -> str:
                     row_tokens.append(">")
                 else:
                     row_tokens.append(" ")
-        lines.append(" ".join(row_tokens))
+        lines.append(" ".join(row_tokens).rstrip())
 
         if r < n - 1:
             vert_tokens: list[str] = []
@@ -33,7 +33,10 @@ def format_solution(puzzle: Puzzle, solved_grid: list[list[int]]) -> str:
                     vert_tokens.append("^")
                 else:
                     vert_tokens.append(" ")
-            lines.append("  ".join(vert_tokens))
+                if c < n - 1:
+                    # Placeholder token for horizontal relation columns.
+                    vert_tokens.append(" ")
+            lines.append(" ".join(vert_tokens).rstrip())
 
     return "\n".join(lines)
 

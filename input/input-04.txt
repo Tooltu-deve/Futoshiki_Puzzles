@@ -1,0 +1,21 @@
+# N
+4
+
+# Grid: N lines, 0 means empty
+1,0,0,0
+0,4,0,0
+0,0,4,0
+0,0,0,1
+
+# Horizontal constraints: N lines with N-1 values
+# 0 = none, 1 = "<", -1 = ">"
+1,1,1
+1,-1,1
+-1,1,-1
+-1,-1,-1
+
+# Vertical constraints: N-1 lines with N values
+# 0 = none, 1 = "<" (top < bottom), -1 = ">" (top > bottom)
+1,1,-1,-1
+-1,-1,1,1
+1,1,-1,-1

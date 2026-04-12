@@ -30,6 +30,18 @@ def _render_sidebar() -> tuple[str | None, str | None]:
 
 def main() -> None:
     st.set_page_config(page_title="Futoshiki Solver", layout="wide")
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stTextArea"] textarea {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+            white-space: pre !important;
+            line-height: 1.45 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     st.title("Futoshiki Solver - Streamlit")
     st.caption("Current solver: Forward chaining")
 
