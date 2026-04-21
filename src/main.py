@@ -6,6 +6,7 @@ import streamlit as st
 
 from core.parser import parse_input_text
 from solvers.forward_chaining import solve_forward_chaining
+from solvers.backward_chaining import solve_backward_chaining
 from utils.io import format_solution, save_text_output
 
 
@@ -43,7 +44,14 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     st.title("Futoshiki Solver - Streamlit")
-    st.caption("Current solver: Forward chaining")
+    
+    # Thêm Selectbox chọn Solver
+    solver_options = {
+        "Forward Chaining": solve_forward_chaining,
+        "Backward Chaining (SLD Resolution)": solve_backward_chaining,
+    }
+    selected_solver_name = st.sidebar.selectbox("Select Solver Algorithm", list(solver_options.keys()))
+    st.caption(f"Current solver: {selected_solver_name}")
 
     if "solved_text" not in st.session_state:
         st.session_state.solved_text = ""
@@ -59,10 +67,16 @@ def main() -> None:
         try:
             puzzle = parse_input_text(raw_input)
             with st.spinner("Solving..."):
-                solved = solve_forward_chaining(puzzle)
+                import time
+                start_t = time.time()
+                solve_func = solver_options[selected_solver_name]
+                solved = solve_func(puzzle)
+                end_t = time.time()
+                
             if solved is None:
                 st.error("No valid solution found.")
             else:
+                st.success(f"Solved in {end_t - start_t:.4f} seconds!")
                 rendered = format_solution(puzzle, solved)
                 st.session_state.solved_text = rendered
 
