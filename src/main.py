@@ -7,6 +7,9 @@ import streamlit as st
 from core.parser import parse_input_text
 from solvers.forward_chaining import solve_forward_chaining
 from solvers.backward_chaining import solve_backward_chaining
+from solvers.a_star import solve_a_star
+from solvers.brute_force import solve_brute_force
+from solvers.backtracking import solve_backtracking
 from utils.io import format_solution, save_text_output
 
 
@@ -49,6 +52,9 @@ def main() -> None:
     solver_options = {
         "Forward Chaining": solve_forward_chaining,
         "Backward Chaining (SLD Resolution)": solve_backward_chaining,
+        "A* Search (with AC-3)": solve_a_star,
+        "Brute-Force": solve_brute_force,
+        "Backtracking (with MRV)": solve_backtracking,
     }
     selected_solver_name = st.sidebar.selectbox("Select Solver Algorithm", list(solver_options.keys()))
     st.caption(f"Current solver: {selected_solver_name}")
