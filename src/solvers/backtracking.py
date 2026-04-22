@@ -75,7 +75,7 @@ class BacktrackingSolver:
         
         return candidates
     
-    def select_cell_mrv(self) -> Cell | None:
+    def select_cell_mrv(self) -> tuple[Cell | None, bool]:
         """
         Chọn ô trống có ít lựa chọn nhất (Minimum Remaining Values heuristic).
         
@@ -84,7 +84,9 @@ class BacktrackingSolver:
         - Giảm branching factor
         
         Returns:
-            Tuple (row, col) của ô trống, hoặc None nếu không có
+            Tuple (cell, is_unsolvable):
+            - cell: Tuple (row, col) của ô trống, hoặc None nếu không có
+            - is_unsolvable: True nếu phát hiện ô không có candidate (vô nghiệm)
         """
         min_candidates = float('inf')
         best_cell = None
@@ -96,14 +98,16 @@ class BacktrackingSolver:
                     
                     # Fail-fast: nếu không có candidate → vô nghiệm
                     if len(candidates) == 0:
-                        return None
+                        return None, True  # Vô nghiệm
                     
                     # MRV: chọn ô có ít candidate nhất
                     if len(candidates) < min_candidates:
                         min_candidates = len(candidates)
                         best_cell = (r, c)
         
-        return best_cell
+        # Nếu best_cell is None: không có ô trống → đã giải xong
+        # Nếu best_cell is not None: còn ô trống → tiếp tục
+        return best_cell, False
     
     def solve(self) -> bool:
         """
@@ -127,14 +131,16 @@ class BacktrackingSolver:
             True nếu tìm được lời giải, False nếu vô nghiệm
         """
         # Chọn ô tiếp theo bằng MRV heuristic
-        cell = self.select_cell_mrv()
+        cell, is_unsolvable = self.select_cell_mrv()
+        
+        # Nếu phát hiện ô không có candidate → vô nghiệm
+        if is_unsolvable:
+            return False
         
         # Nếu không có ô trống → đã giải xong
         if cell is None:
             return True
         
-        # Nếu ô được chọn không có candidate → vô nghiệm
-        # (select_cell_mrv đã check, nhưng double-check để an toàn)
         row, col = cell
         candidates = self.get_candidates(row, col)
         
@@ -161,10 +167,16 @@ class BacktrackingSolver:
         Giải puzzle và trả về lưới đã giải.
         
         Returns:
-            Lưới đã giải nếu tìm được lời giải, None nếu vô nghiệm
+            Lưới đã giải nếu tìm được lời giải hợp lệ (không có 0),
+            None nếu vô nghiệm hoặc không thể giải hoàn toàn
         """
         if self.solve():
-            return self.grid
+            # Kiểm tra cuối cùng: solution không được chứa 0
+            # Nếu có 0 → bug hoặc puzzle vô nghiệm → return None
+            zero_count = sum(1 for row in self.grid for v in row if v == 0)
+            if zero_count == 0:
+                return self.grid
+        
         return None
 
 
