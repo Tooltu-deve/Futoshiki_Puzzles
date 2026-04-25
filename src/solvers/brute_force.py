@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from core.types import Puzzle
+from utils.tracer import Tracer
 
 
 Cell = tuple[int, int]
@@ -9,11 +10,12 @@ Cell = tuple[int, int]
 class BruteForceSolver:
     """Brute-Force Backtracking solver cho Futoshiki Puzzles"""
     
-    def __init__(self, puzzle: Puzzle):
+    def __init__(self, puzzle: Puzzle, tracer: Tracer | None = None):
         self.puzzle = puzzle
         self.n = puzzle.size
         self.grid = [row[:] for row in puzzle.grid]  # Copy grid
         self.expanded_count = 0  # Đếm số nút được mở rộng
+        self.t = tracer or Tracer(enabled=False)
     
     def find_empty_cell(self) -> Cell | None:
         """
@@ -123,20 +125,22 @@ class BruteForceSolver:
         
         row, col = cell
         self.expanded_count += 1
-        
-        # Thử giá trị 1 đến N
+        self.t.log(f"#{self.expanded_count:<4} first-empty -> ({row},{col})")
+
+        self.t.push()
         for value in range(1, self.n + 1):
             if self.is_valid(row, col, value):
-                # Gán giá trị
                 self.grid[row][col] = value
-                
-                # Đệ quy giải tiếp
+                self.t.log(f"try   ({row},{col}) = {value}")
+                self.t.push()
                 if self.solve():
+                    self.t.pop()
+                    self.t.pop()
                     return True
-                
-                # Quay lui: đặt lại 0 nếu đệ quy thất bại
+                self.t.pop()
                 self.grid[row][col] = 0
-        
+                self.t.log(f"undo  ({row},{col}) = {value}")
+        self.t.pop()
         return False
     
     def get_solution(self) -> list[list[int]] | None:
@@ -151,7 +155,7 @@ class BruteForceSolver:
         return None
 
 
-def solve_brute_force(puzzle: Puzzle) -> list[list[int]] | None:
+def solve_brute_force(puzzle: Puzzle, tracer: Tracer | None = None) -> list[list[int]] | None:
     """
     Giải Futoshiki puzzle sử dụng thuật toán Brute-Force Backtracking.
     
@@ -174,5 +178,16 @@ def solve_brute_force(puzzle: Puzzle) -> list[list[int]] | None:
     Returns:
         Grid đã giải nếu có, None nếu puzzle vô nghiệm
     """
-    solver = BruteForceSolver(puzzle)
-    return solver.get_solution()
+    solver = BruteForceSolver(puzzle, tracer=tracer)
+    if tracer is not None:
+        tracer.header("Brute-Force Backtracking", f"N={solver.n}")
+        tracer.log("[init] scan empty cells left-to-right, top-to-bottom")
+        tracer.blank()
+    result = solver.get_solution()
+    if tracer is not None:
+        tracer.blank()
+        if result is None:
+            tracer.log(f"[done] NO SOLUTION after {solver.expanded_count} cell picks")
+        else:
+            tracer.log(f"[done] SUCCESS — solved with {solver.expanded_count} cell picks")
+    return result

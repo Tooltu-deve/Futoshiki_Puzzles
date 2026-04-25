@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 from core.types import Puzzle
+from utils.tracer import Tracer
 
 
 Cell = tuple[int, int]
@@ -194,11 +195,12 @@ class AC3:
 class AStarSolver:
     """A* Search solver cho Futoshiki Puzzles"""
     
-    def __init__(self, puzzle: Puzzle):
+    def __init__(self, puzzle: Puzzle, tracer: Tracer | None = None):
         self.puzzle = puzzle
         self.n = puzzle.size
         self.ac3 = AC3(puzzle)
         self.expanded_count = 0  # Đếm số nút được mở rộng
+        self.t = tracer or Tracer(enabled=False)
     
     def _init_domains(self) -> dict[Cell, set[int]]:
         """Khởi tạo domains cho tất cả ô"""
@@ -261,9 +263,14 @@ class AStarSolver:
         # Khởi tạo trạng thái ban đầu
         initial_domains = self._init_domains()
         
-        # Áp dụng AC-3 trên trạng thái ban đầu
+        self.t.header("A* Search + AC-3", f"N={self.n}")
+        self.t.log("[init] running AC-3 on initial state")
         if not self.ac3.propagate(initial_domains):
+            self.t.log("[init] [FAIL] AC-3 found inconsistency")
             return None
+        solved0 = sum(1 for d in initial_domains.values() if len(d) == 1)
+        self.t.log(f"[init] AC-3 done — {solved0}/{self.n*self.n} cells fixed")
+        self.t.blank()
         
         initial_grid = self._extract_grid(initial_domains)
         initial_h = self._heuristic(initial_domains)
@@ -283,31 +290,39 @@ class AStarSolver:
         while open_set:
             # Lấy nút có f(s) nhỏ nhất
             current = heapq.heappop(open_set)
-            
+
             # Kiểm tra đích
             if self._is_goal(current.domains):
+                self.t.blank()
+                self.t.log(
+                    f"[goal] reached after {self.expanded_count} expansions "
+                    f"(open={len(open_set)}, closed={len(closed_set)})"
+                )
                 return self._extract_grid(current.domains)
-            
+
             # Đánh dấu nút đã mở rộng
             self.expanded_count += 1
             state_hash = frozenset(
                 (cell, frozenset(domain))
                 for cell, domain in current.domains.items()
             )
-            
+
             if state_hash in closed_set:
                 continue
             closed_set.add(state_hash)
-            
+
             # Chọn ô để gán (MRV heuristic)
             cell = self._select_cell(current.domains)
             if cell is None:
                 continue
-            
+
             r, c = cell
             domain = current.domains[cell]
-            
-            # Tạo các trạng thái con bằng cách thử gán từng giá trị trong domain
+            self.t.log(
+                f"#{self.expanded_count:<3} pop  f={current.f_score:<3.0f} g={current.g_score:<3} "
+                f"h={current.h_score:<3.0f}  MRV -> ({r},{c}) in {sorted(domain)}"
+            )
+            self.t.push()
             for value in sorted(domain):
                 # Sao chép domains
                 new_domains = {}
@@ -319,12 +334,16 @@ class AStarSolver:
                 
                 # Áp dụng AC-3 propagation
                 if not self.ac3.propagate(new_domains):
+                    self.t.log(f"branch ({r},{c}) = {value}   [pruned by AC-3]")
                     continue
-                
+
                 # Tính g(s), h(s), f(s)
                 g_score = current.g_score + 1
                 h_score = self._heuristic(new_domains)
                 f_score = g_score + h_score
+                self.t.log(
+                    f"branch ({r},{c}) = {value}   -> child f={f_score:<3.0f} g={g_score:<3} h={h_score:<3.0f}"
+                )
                 
                 new_grid = self._extract_grid(new_domains)
                 new_node = StateNode(
@@ -337,11 +356,12 @@ class AStarSolver:
                 )
                 
                 heapq.heappush(open_set, new_node)
-        
+            self.t.pop()
+
         return None
 
 
-def solve_a_star(puzzle: Puzzle) -> list[list[int]] | None:
+def solve_a_star(puzzle: Puzzle, tracer: Tracer | None = None) -> list[list[int]] | None:
     """
     Giải Futoshiki puzzle sử dụng A* search với AC-3 propagation.
     
@@ -358,5 +378,12 @@ def solve_a_star(puzzle: Puzzle) -> list[list[int]] | None:
     - AC-3: Kiểm tra và lan truyền constraints
     - MRV: Chọn ô có ít lựa chọn nhất để gán tiếp
     """
-    solver = AStarSolver(puzzle)
-    return solver.solve()
+    solver = AStarSolver(puzzle, tracer=tracer)
+    result = solver.solve()
+    if tracer is not None:
+        tracer.blank()
+        if result is None:
+            tracer.log(f"[done] NO SOLUTION — open set exhausted after {solver.expanded_count} expansions")
+        else:
+            tracer.log(f"[done] SUCCESS — {solver.expanded_count} expansions")
+    return result

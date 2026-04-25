@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from core.types import Puzzle
+from utils.tracer import Tracer
 
 
-def solve_backward_chaining(puzzle: Puzzle) -> list[list[int]] | None:
+def solve_backward_chaining(puzzle: Puzzle, tracer: Tracer | None = None) -> list[list[int]] | None:
+    t = tracer or Tracer(enabled=False)
     """
     Giả lập máy suy diễn Prolog (Backward Chaining / SLD Resolution).
     Mỗi ô (r, c) cần được truy vấn: ?- Val(r, c, V)
@@ -86,28 +88,36 @@ def solve_backward_chaining(puzzle: Puzzle) -> list[list[int]] | None:
         # Nếu KB đã có sẵn Fact (Given Clue):
         if puzzle.grid[r][c] != 0:
             if not is_consistent_with_kb(r, c, puzzle.grid[r][c]):
-                return False  # Fact mâu thuẫn (như file test-02.txt)
-            # Khớp Fact thành công, đi tiếp đến Sub-Goal kế tiếp
+                t.log(f"[FAIL] fact ({r},{c})={puzzle.grid[r][c]} violates KB")
+                return False
             return prove_goal(index + 1)
 
-        # Nếu ô trống, thực hiện truy vấn ?- Val(r, c, V)
+        t.log(f"?- Val({r},{c}, V)")
+        t.push()
         for v in range(1, n + 1):
-            # Thử hợp nhất (Unification) V vào Knowledge Base
             if is_consistent_with_kb(r, c, v):
-                grid[r][c] = v  # Binding (Gán môi trường)
-                
-                # Gọi đệ quy quy nạp backward (SLD branch evaluation)
+                grid[r][c] = v
+                t.log(f"unify V = {v}    -> bind ({r},{c}) = {v}")
+                t.push()
                 if prove_goal(index + 1):
+                    t.pop()
+                    t.pop()
                     return True
-                
-                # Nếu nhánh thất bại -> Undo (Hủy binding) -> Backtracking tìm nhánh khác
+                t.pop()
                 grid[r][c] = 0
-
-        # Nếu tất cả các Vều thất bại, nhánh SLD này là cụt (Dead-end branch)
+                t.log(f"backtrack ({r},{c})")
+        t.log(f"[dead-end] all V exhausted at ({r},{c})")
+        t.pop()
         return False
 
-    # Khởi tạo truy vấn gốc (Root Goal)
+    t.header("Backward Chaining (SLD Resolution)", f"N={n}")
+    t.log("[init] root goal: ?- solve_grid")
+    t.blank()
     if prove_goal(0):
+        t.blank()
+        t.log("[done] SUCCESS — root goal proved")
         return grid
-    
+
+    t.blank()
+    t.log("[done] NO SOLUTION — root goal failed")
     return None

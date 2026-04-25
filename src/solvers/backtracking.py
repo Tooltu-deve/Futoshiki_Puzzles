@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from core.types import Puzzle
+from utils.tracer import Tracer
 
 
 Cell = tuple[int, int]
@@ -9,11 +10,12 @@ Cell = tuple[int, int]
 class BacktrackingSolver:
     """Backtracking solver với constraint checking và MRV heuristic"""
     
-    def __init__(self, puzzle: Puzzle):
+    def __init__(self, puzzle: Puzzle, tracer: Tracer | None = None):
         self.puzzle = puzzle
         self.n = puzzle.size
         self.grid = [row[:] for row in puzzle.grid]
         self.expanded_count = 0
+        self.t = tracer or Tracer(enabled=False)
     
     def get_candidates(self, row: int, col: int) -> set[int]:
         """
@@ -130,36 +132,37 @@ class BacktrackingSolver:
         Returns:
             True nếu tìm được lời giải, False nếu vô nghiệm
         """
-        # Chọn ô tiếp theo bằng MRV heuristic
         cell, is_unsolvable = self.select_cell_mrv()
-        
-        # Nếu phát hiện ô không có candidate → vô nghiệm
+
         if is_unsolvable:
+            self.t.log("[dead-end] MRV: a cell has empty candidate set")
             return False
-        
-        # Nếu không có ô trống → đã giải xong
+
         if cell is None:
             return True
-        
+
         row, col = cell
         candidates = self.get_candidates(row, col)
-        
+
         if not candidates:
             return False
-        
+
         self.expanded_count += 1
-        
-        # Thử từng candidate (đã sắp xếp giúp tìm lời giải nhanh hơn)
+        self.t.log(f"#{self.expanded_count:<4} MRV -> ({row},{col})  candidates = {sorted(candidates)}")
+
+        self.t.push()
         for value in sorted(candidates):
             self.grid[row][col] = value
-            
-            # Đệ quy
+            self.t.log(f"try   ({row},{col}) = {value}")
+            self.t.push()
             if self.solve():
+                self.t.pop()
+                self.t.pop()
                 return True
-            
-            # Quay lui
+            self.t.pop()
             self.grid[row][col] = 0
-        
+            self.t.log(f"undo  ({row},{col}) = {value}")
+        self.t.pop()
         return False
     
     def get_solution(self) -> list[list[int]] | None:
@@ -180,7 +183,7 @@ class BacktrackingSolver:
         return None
 
 
-def solve_backtracking(puzzle: Puzzle) -> list[list[int]] | None:
+def solve_backtracking(puzzle: Puzzle, tracer: Tracer | None = None) -> list[list[int]] | None:
     """
     Giải Futoshiki puzzle sử dụng thuật toán Backtracking.
     
@@ -217,5 +220,16 @@ def solve_backtracking(puzzle: Puzzle) -> list[list[int]] | None:
     Returns:
         Grid đã giải nếu có, None nếu puzzle vô nghiệm
     """
-    solver = BacktrackingSolver(puzzle)
-    return solver.get_solution()
+    solver = BacktrackingSolver(puzzle, tracer=tracer)
+    if tracer is not None:
+        tracer.header("Backtracking + MRV", f"N={solver.n}")
+        tracer.log("[init] pick cell with fewest candidates each step")
+        tracer.blank()
+    result = solver.get_solution()
+    if tracer is not None:
+        tracer.blank()
+        if result is None:
+            tracer.log(f"[done] NO SOLUTION after {solver.expanded_count} MRV picks")
+        else:
+            tracer.log(f"[done] SUCCESS — solved with {solver.expanded_count} MRV picks")
+    return result
